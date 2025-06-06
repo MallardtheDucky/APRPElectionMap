@@ -40,10 +40,10 @@
       height: 100%;
       transition: width 0.5s ease-in-out;
     }
-    .progress-bar.rockefeller {
+    .progress-bar.bush {
       background: #e74c3c;
     }
-    .progress-bar.gephardt {
+    .progress-bar.clinton {
       background: #3498db;
       position: absolute;
       right: 0;
@@ -115,28 +115,28 @@
   <div class="title">1988 Live Election Map</div>
   <div class="progress-container">
     <div class="candidate-labels">
-      <span>Rockefeller: <span id="rockefeller-votes">0</span></span>
-      <span>Gephardt: <span id="gephardt-votes">0</span></span>
+      <span>Bush: <span id="bush-votes">0</span></span>
+      <span>Clinton: <span id="clinton-votes">0</span></span>
     </div>
     <div class="progress-bar-container">
-      <img src="images/Jay_Rockefeller_portrait (3).jpg" alt="Rockefeller" class="candidate-image">
+      <img src="images/George-H-W-Bush.jpg" alt="Bush" class="candidate-image">
       <div style="width: 100%; position: relative;">
         <div class="threshold-label">270 to Win</div>
         <div class="progress-bar-wrapper">
           <div class="threshold-marker"></div>
-          <div class="progress-bar rockefeller" id="rockefeller-bar" style="width: 0%"></div>
-          <div class="progress-bar gephardt" id="gephardt-bar" style="width: 0%"></div>
-          <div class="vote-label" id="rockefeller-label" style="left: 5px">0</div>
-          <div class="vote-label" id="gephardt-label" style="right: 5px">0</div>
+          <div class="progress-bar bush" id="bush-bar" style="width: 0%"></div>
+          <div class="progress-bar clinton" id="clinton-bar" style="width: 0%"></div>
+          <div class="vote-label" id="bush-label" style="left: 5px">0</div>
+          <div class="vote-label" id="clinton-label" style="right: 5px">0</div>
         </div>
       </div>
-      <img src="images/Dick_Gephardt_portrait.jpg" alt="Gephardt" class="candidate-image">
+      <img src="images/Bill_Clinton.jpg" alt="Clinton" class="candidate-image">
     </div>
   </div>
   <div class="candidate-stats">
-    <div class="candidate-stat-left" id="rockefeller-pv">Rockefeller: 0 (0%)</div>
+    <div class="candidate-stat-left" id="bush-pv">Bush: 0 (0%)</div>
     <div class="stat-box" id="reporting">Reporting: 0%</div>
-    <div class="candidate-stat-right" id="gephardt-pv">Gephardt: 0 (0%)</div>
+    <div class="candidate-stat-right" id="clinton-pv">Clinton: 0 (0%)</div>
   </div>
 </div>
 <div id="map"></div>
@@ -155,8 +155,8 @@
       const res = await fetch('https://script.google.com/macros/s/AKfycbzFWbDsXFOlHnpvAWTW1hmwCtf7eaSfjdWJPiOzvk5_7XTS0RNoWkBtzCMV2xer21XaHw/exec');
       const data = await res.json();
 
-      let ev_rockefeller = 0;
-      let ev_gephardt = 0;
+      let ev_bush = 0;
+      let ev_clinton = 0;
       let total_gop_votes = 0;
       let total_dem_votes = 0;
       let total_votes = 0;
@@ -176,9 +176,9 @@
 
         if (reporting === 100) {
           if (gop_votes > dem_votes) {
-            ev_rockefeller += Number(props.electoral_votes || 0);
+            ev_bush += Number(props.electoral_votes || 0);
           } else if (dem_votes > gop_votes) {
-            ev_gephardt += Number(props.electoral_votes || 0);
+            ev_clinton += Number(props.electoral_votes || 0);
           }
         }
       });
@@ -188,14 +188,14 @@
       const perc_dem = ((total_dem_votes / total_registered) * 100).toFixed(1);
       const reporting_pct = ((total_votes / total_registered) * 100).toFixed(1);
 
-      document.getElementById('rockefeller-votes').textContent = ev_rockefeller;
-      document.getElementById('gephardt-votes').textContent = ev_gephardt;
-      document.getElementById('rockefeller-bar').style.width = `${(ev_rockefeller / 538) * 100}%`;
-      document.getElementById('gephardt-bar').style.width = `${(ev_gephardt / 538) * 100}%`;
-      document.getElementById('rockefeller-label').textContent = ev_rockefeller;
-      document.getElementById('gephardt-label').textContent = ev_gephardt;
-      document.getElementById('rockefeller-pv').textContent = `Rockefeller: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
-      document.getElementById('gephardt-pv').textContent = `Gephardt: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
+      document.getElementById('bush-votes').textContent = ev_bush;
+      document.getElementById('clinton-votes').textContent = ev_clinton;
+      document.getElementById('bush-bar').style.width = `${(ev_bush / 538) * 100}%`;
+      document.getElementById('clinton-bar').style.width = `${(ev_clinton / 538) * 100}%`;
+      document.getElementById('bush-label').textContent = ev_bush;
+      document.getElementById('clinton-label').textContent = ev_clinton;
+      document.getElementById('bush-pv').textContent = `Bush: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
+      document.getElementById('clinton-pv').textContent = `Clinton: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
       document.getElementById('reporting').textContent = `Reporting: ${reporting_pct}%`;
 
       map.addSource('states', {
@@ -243,8 +243,8 @@
         const perc_dem = total > 0 ? ((dem_votes / total) * 100).toFixed(1) : 0;
         const winner = p.winner === 'UNKNOWN' ? 'Uncalled' : p.winner;
 
-        const gopCandidate = p.gop_candidate || 'Rockefeller';
-        const demCandidate = p.dem_candidate || 'Gephardt';
+        const gopCandidate = p.gop_candidate || 'Bush';
+        const demCandidate = p.dem_candidate || 'Clinton';
         const gopCheck = winner === gopCandidate ? '✓ ' : '';
         const demCheck = winner === demCandidate ? '✓ ' : '';
 

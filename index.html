@@ -152,34 +152,29 @@
 
   map.on('load', async () => {
     try {
-      const res = await fetch('https://script.google.com/macros/s/AKfycbzHwSLfVX_5iEHbIU-kNzrSp3CVJX4DwgJRMvcj_i5fy7eYd9p8fyfPtzXe805uDUrmJA/exec');
+      const res = await fetch('https://script.google.com/macros/s/AKfycbxwLtVFgnHndmFZ2c2M3zS3BFepj3DzWggzwQKH8gO9ohI0R-dyySpAYyOvrjm_FlxDGQ/exec');
       const data = await res.json();
+      console.log('GeoJSON data loaded:', data);
 
-      let ev_bush = 0;
-      let ev_clinton = 0;
-      let total_gop_votes = 0;
-      let total_dem_votes = 0;
-      let total_votes = 0;
+      let ev_bush = 0, ev_clinton = 0;
+      let total_gop_votes = 0, total_dem_votes = 0, total_votes = 0;
 
       data.features.forEach(f => {
-        const props = f.properties;
-        if (props.abbr === 'PR') return;
+        const p = f.properties;
+        if (p.abbr === 'PR') return;
 
-        const gop_votes = Math.round(Number(props.votes_gop || 0));
-        const dem_votes = Math.round(Number(props.votes_dem || 0));
-        const reporting = Number(props.reporting || 0);
-        const total = gop_votes + dem_votes;
+        const gop = Number(p.votes_gop || 0);
+        const dem = Number(p.votes_dem || 0);
+        const reporting = Number(p.reporting || 0);
+        const total = gop + dem;
 
-        total_gop_votes += gop_votes;
-        total_dem_votes += dem_votes;
+        total_gop_votes += gop;
+        total_dem_votes += dem;
         total_votes += total;
 
         if (reporting === 100) {
-          if (gop_votes > dem_votes) {
-            ev_bush += Number(props.electoral_votes || 0);
-          } else if (dem_votes > gop_votes) {
-            ev_clinton += Number(props.electoral_votes || 0);
-          }
+          if (gop > dem) ev_bush += Number(p.electoral_votes || 0);
+          else if (dem > gop) ev_clinton += Number(p.electoral_votes || 0);
         }
       });
 
@@ -234,13 +229,12 @@
 
       map.on('click', 'states-fill', (e) => {
         const p = e.features[0].properties;
-
-        const gop_votes = Math.round(Number(p.votes_gop || 0));
-        const dem_votes = Math.round(Number(p.votes_dem || 0));
+        const gop_votes = Number(p.votes_gop || 0);
+        const dem_votes = Number(p.votes_dem || 0);
         const total = gop_votes + dem_votes;
 
-        const perc_gop = total > 0 ? ((gop_votes / total) * 100).toFixed(1) : 0;
-        const perc_dem = total > 0 ? ((dem_votes / total) * 100).toFixed(1) : 0;
+        const perc_gop = total ? ((gop_votes / total) * 100).toFixed(1) : '0.0';
+        const perc_dem = total ? ((dem_votes / total) * 100).toFixed(1) : '0.0';
         const winner = p.winner === 'UNKNOWN' ? 'Uncalled' : p.winner;
 
         const gopCandidate = p.gop_candidate || 'Bush';

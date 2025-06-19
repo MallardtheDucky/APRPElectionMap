@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>1988 Live Election Map</title>
+  <title>1992 Live Election Map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.js"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.css" rel="stylesheet" />
@@ -60,7 +60,7 @@
 </head>
 <body>
 <div id="header">
-  <div class="title">1988 Live Election Map</div>
+  <div class="title">1992 Live Election Map</div>
   <div class="progress-container">
     <div class="candidate-labels">
       <span>Bush: <span id="bush-votes">0</span></span>
@@ -100,10 +100,10 @@
 
   map.on('load', async () => {
     try {
-      const res = await fetch('https://script.google.com/macros/s/AKfycbyVFfmIUZ-wFDifo-gR-DWFahbdz84n2ghhzMZGQX_mMB7ha9DWjrpqPffNlRsp9nTQhw/exec');
+      const res = await fetch('https://script.google.com/macros/s/AKfycbzxzzJT-mqKYsVLtanqrw4Utugnf206W2nH_chk6FozzC1gs5gdxsZxHAD-sJ9fI5mlAg/exec');
       const data = await res.json();
 
-      let ev_bush = 0, ev_clinton = 0, total_gop_votes = 0, total_dem_votes = 0, total_votes = 0;
+      let ev_bush = 0, ev_clinton = 0, ev_ind = 0, total_gop_votes = 0, total_dem_votes = 0, total_ind_votes = 0, total_votes = 0;
 
       data.features.forEach(f => {
         const props = f.properties;
@@ -111,23 +111,26 @@
 
         const gop = +props.votes_gop || 0;
         const dem = +props.votes_dem || 0;
+        const ind = +props.votes_ind || 0;
         const reporting = +props.reporting || 0;
-        const total = gop + dem;
+        const total = gop + dem + ind;
 
         total_gop_votes += gop;
         total_dem_votes += dem;
+        total_ind_votes += ind;
         total_votes += total;
 
         if (reporting === 100) {
-          if (gop > dem) ev_bush += +props.electoral_votes;
-          else if (dem > gop) ev_clinton += +props.electoral_votes;
+          if (props.status === 'GOP Win') ev_bush += +props.electoral_votes;
+          else if (props.status === 'DEM Win') ev_clinton += +props.electoral_votes;
+          else if (props.status === 'IND Win') ev_ind += +props.electoral_votes;
         }
       });
 
-      const total_registered = 93204248;
+      const total_registered = 104335048;
       const perc_gop = ((total_gop_votes / total_registered) * 100).toFixed(1);
       const perc_dem = ((total_dem_votes / total_registered) * 100).toFixed(1);
-      const reporting_pct = ((total_votes / total_registered) * 100).toFixed(1);
+      const reporting_pct = Math.round((total_votes / total_registered) * 100);
 
       document.getElementById('bush-votes').textContent = ev_bush;
       document.getElementById('clinton-votes').textContent = ev_clinton;
@@ -151,8 +154,10 @@
             ['get', 'status'],
             'GOP Win', '#d12c0f',
             'DEM Win', '#0e47e6',
+            'IND Win', '#d900d9',
             'Lean GOP', '#f4a6a6',
             'Lean DEM', '#a6c8f4',
+            'Lean IND', '#ffb2ff',
             'Uncalled', '#cccccc',
             '#ffffff'
           ],
@@ -175,16 +180,20 @@
 
         const gop = +p.votes_gop || 0;
         const dem = +p.votes_dem || 0;
-        const total = gop + dem;
+        const ind = +p.votes_ind || 0;
+        const total = gop + dem + ind;
 
         const gopPerc = total > 0 ? ((gop / total) * 100).toFixed(1) : 0;
         const demPerc = total > 0 ? ((dem / total) * 100).toFixed(1) : 0;
+        const indPerc = total > 0 ? ((ind / total) * 100).toFixed(1) : 0;
         const winner = p.winner === 'UNKNOWN' ? 'Uncalled' : p.winner;
 
         const gopName = p.gop_candidate || 'Bush';
         const demName = p.dem_candidate || 'Clinton';
+        const indName = p.ind_candidate || 'Unknown';
         const gopCheck = winner === gopName ? '✓ ' : '';
         const demCheck = winner === demName ? '✓ ' : '';
+        const indCheck = winner === indName ? '✓ ' : '';
 
         new mapboxgl.Popup()
           .setLngLat(e.lngLat)
@@ -194,6 +203,7 @@
             <b>Reporting:</b> ${p.reporting}%<br/>
             <b style="color:#d12c0f;">${gopCheck}${gopName}:</b> ${gop.toLocaleString()} (${gopPerc}%)<br/>
             <b style="color:#0e47e6;">${demCheck}${demName}:</b> ${dem.toLocaleString()} (${demPerc}%)<br/>
+            <b style="color:#d900d9;">${indCheck}${indName} (${p.ind_party || 'Independent'}):</b> ${ind.toLocaleString()} (${indPerc}%)<br/>
             <b>Winner:</b> ${winner}
           `)
           .addTo(map);

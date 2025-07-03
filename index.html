@@ -20,8 +20,8 @@
       width: 100%; height: 20px; background: #444; border-radius: 10px; overflow: hidden;
     }
     .progress-bar { height: 100%; transition: width 0.5s ease-in-out; }
-    .progress-bar.bush { background: #e74c3c; }
-    .progress-bar.clinton { background: #3498db; position: absolute; right: 0; }
+    .progress-bar.ross { background: #e74c3c; }
+    .progress-bar.perot { background: #3498db; position: absolute; right: 0; }
     .vote-label {
       position: absolute; color: white; font-size: 12px;
       font-weight: bold; text-shadow: 0 0 2px rgba(0,0,0,0.7);
@@ -63,28 +63,28 @@
   <div class="title">1992 Live Election Map</div>
   <div class="progress-container">
     <div class="candidate-labels">
-      <span>Bush: <span id="bush-votes">0</span></span>
-      <span>Clinton: <span id="clinton-votes">0</span></span>
+      <span>Ross: <span id="ross-votes">0</span></span>
+      <span>Perot: <span id="perot-votes">0</span></span>
     </div>
     <div class="progress-bar-container">
-      <img src="images/George-H-W-Bush.jpg" alt="Bush" class="candidate-image">
+      <img src="images/Thaddeus_Ross.jpg" alt="Ross" class="candidate-image">
       <div style="width: 100%; position: relative;">
         <div class="threshold-label">270 to Win</div>
         <div class="progress-bar-wrapper">
           <div class="threshold-marker"></div>
-          <div class="progress-bar bush" id="bush-bar" style="width: 0%"></div>
-          <div class="progress-bar clinton" id="clinton-bar" style="width: 0%"></div>
-          <div class="vote-label" id="bush-label" style="left: 5px">0</div>
-          <div class="vote-label" id="clinton-label" style="right: 5px">0</div>
+          <div class="progress-bar ross" id="ross-bar" style="width: 0%"></div>
+          <div class="progress-bar perot" id="perot-bar" style="width: 0%"></div>
+          <div class="vote-label" id="ross-label" style="left: 5px">0</div>
+          <div class="vote-label" id="perot-label" style="right: 5px">0</div>
         </div>
       </div>
-      <img src="images/Bill_Clinton.jpg" alt="Clinton" class="candidate-image">
+      <img src="images/Ross_Perot.jpg" alt="Perot" class="candidate-image">
     </div>
   </div>
   <div class="candidate-stats">
-    <div class="candidate-stat-left" id="bush-pv">Bush: 0 (0%)</div>
+    <div class="candidate-stat-left" id="ross-pv">Ross: 0 (0%)</div>
     <div class="stat-box" id="reporting">Reporting: 0%</div>
-    <div class="candidate-stat-right" id="clinton-pv">Clinton: 0 (0%)</div>
+    <div class="candidate-stat-right" id="perot-pv">Perot: 0 (0%)</div>
   </div>
 </div>
 <div id="map"></div>
@@ -103,7 +103,7 @@
       const res = await fetch('https://script.google.com/macros/s/AKfycbzxzzJT-mqKYsVLtanqrw4Utugnf206W2nH_chk6FozzC1gs5gdxsZxHAD-sJ9fI5mlAg/exec');
       const data = await res.json();
 
-      let ev_bush = 0, ev_clinton = 0, ev_ind = 0, total_gop_votes = 0, total_dem_votes = 0, total_ind_votes = 0, total_votes = 0;
+      let ev_ross = 0, ev_perot = 0, ev_ind = 0, total_gop_votes = 0, total_dem_votes = 0, total_ind_votes = 0, total_votes = 0;
 
       data.features.forEach(f => {
         const props = f.properties;
@@ -121,8 +121,8 @@
         total_votes += total;
 
         if (reporting === 100) {
-          if (props.status === 'GOP Win') ev_bush += +props.electoral_votes;
-          else if (props.status === 'DEM Win') ev_clinton += +props.electoral_votes;
+          if (props.status === 'GOP Win') ev_ross += +props.electoral_votes;
+          else if (props.status === 'DEM Win') ev_perot += +props.electoral_votes;
           else if (props.status === 'IND Win') ev_ind += +props.electoral_votes;
         }
       });
@@ -132,14 +132,14 @@
       const perc_dem = ((total_dem_votes / total_registered) * 100).toFixed(1);
       const reporting_pct = Math.round((total_votes / total_registered) * 100);
 
-      document.getElementById('bush-votes').textContent = ev_bush;
-      document.getElementById('clinton-votes').textContent = ev_clinton;
-      document.getElementById('bush-bar').style.width = `${(ev_bush / 538) * 100}%`;
-      document.getElementById('clinton-bar').style.width = `${(ev_clinton / 538) * 100}%`;
-      document.getElementById('bush-label').textContent = ev_bush;
-      document.getElementById('clinton-label').textContent = ev_clinton;
-      document.getElementById('bush-pv').textContent = `Bush: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
-      document.getElementById('clinton-pv').textContent = `Clinton: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
+      document.getElementById('ross-votes').textContent = ev_ross;
+      document.getElementById('perot-votes').textContent = ev_perot;
+      document.getElementById('ross-bar').style.width = `${(ev_ross / 538) * 100}%`;
+      document.getElementById('perot-bar').style.width = `${(ev_perot / 538) * 100}%`;
+      document.getElementById('ross-label').textContent = ev_ross;
+      document.getElementById('perot-label').textContent = ev_perot;
+      document.getElementById('ross-pv').textContent = `Ross: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
+      document.getElementById('perot-pv').textContent = `Perot: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
       document.getElementById('reporting').textContent = `Reporting: ${reporting_pct}%`;
 
       map.addSource('states', { type: 'geojson', data: data });
@@ -188,8 +188,8 @@
         const indPerc = total > 0 ? ((ind / total) * 100).toFixed(1) : 0;
         const winner = p.winner === 'UNKNOWN' ? 'Uncalled' : p.winner;
 
-        const gopName = p.gop_candidate || 'Bush';
-        const demName = p.dem_candidate || 'Clinton';
+        const gopName = p.gop_candidate || 'Ross';
+        const demName = p.dem_candidate || 'Perot';
         const indName = p.ind_candidate || 'Unknown';
         const gopCheck = winner === gopName ? '✓ ' : '';
         const demCheck = winner === demName ? '✓ ' : '';

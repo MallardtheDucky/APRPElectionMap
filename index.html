@@ -20,8 +20,8 @@
       width: 100%; height: 20px; background: #444; border-radius: 10px; overflow: hidden;
     }
     .progress-bar { height: 100%; transition: width 0.5s ease-in-out; }
-    .progress-bar.johnson { background: #e74c3c; }
-    .progress-bar.underwood { background: #3498db; position: absolute; right: 0; }
+    .progress-bar.callahan { background: #e74c3c; }
+    .progress-bar.noble { background: #3498db; position: absolute; right: 0; }
     .vote-label {
       position: absolute; color: white; font-size: 12px;
       font-weight: bold; text-shadow: 0 0 2px rgba(0,0,0,0.7);
@@ -63,28 +63,28 @@
   <div class="title">1996 Live Election Map</div>
   <div class="progress-container">
     <div class="candidate-labels">
-      <span>Johnson: <span id="johnson-votes">0</span></span>
-      <span>Underwood: <span id="underwood-votes">0</span></span>
+      <span>Callahan: <span id="callahan-votes">0</span></span>
+      <span>Noble: <span id="noble-votes">0</span></span>
     </div>
     <div class="progress-bar-container">
-      <img src="images/williamjohnson.png" alt="Johnson" class="candidate-image">
+      <img src="images/robertcallahan.png" alt="Callahan" class="candidate-image">
       <div style="width: 100%; position: relative;">
         <div class="threshold-label">270 to Win</div>
         <div class="progress-bar-wrapper">
           <div class="threshold-marker"></div>
-          <div class="progress-bar johnson" id="johnson-bar" style="width: 0%"></div>
-          <div class="progress-bar underwood" id="underwood-bar" style="width: 0%"></div>
-          <div class="vote-label" id="johnson-label" style="left: 5px">0</div>
-          <div class="vote-label" id="underwood-label" style="right: 5px">0</div>
+          <div class="progress-bar callahan" id="callahan-bar" style="width: 0%"></div>
+          <div class="progress-bar noble" id="noble-bar" style="width: 0%"></div>
+          <div class="vote-label" id="callahan-label" style="left: 5px">0</div>
+          <div class="vote-label" id="noble-label" style="right: 5px">0</div>
         </div>
       </div>
-      <img src="images/frankunderwood.png" alt="Underwood" class="candidate-image">
+      <img src="images/elainenoble.png" alt="Noble" class="candidate-image">
     </div>
   </div>
   <div class="candidate-stats">
-    <div class="candidate-stat-left" id="johnson-pv">Johnson: 0 (0%)</div>
+    <div class="candidate-stat-left" id="callahan-pv">Callahan: 0 (0%)</div>
     <div class="stat-box" id="reporting">Reporting: 0%</div>
-    <div class="candidate-stat-right" id="underwood-pv">Underwood: 0 (0%)</div>
+    <div class="candidate-stat-right" id="noble-pv">Noble: 0 (0%)</div>
   </div>
 </div>
 <div id="map"></div>
@@ -103,7 +103,7 @@
       const res = await fetch('https://script.google.com/macros/s/AKfycbzxzzJT-mqKYsVLtanqrw4Utugnf206W2nH_chk6FozzC1gs5gdxsZxHAD-sJ9fI5mlAg/exec');
       const data = await res.json();
 
-      let ev_johnson = 0, ev_underwood = 0, ev_other = 0, total_gop_votes = 0, total_dem_votes = 0, total_ind_votes = 0, total_votes = 0;
+      let ev_callahan = 0, ev_noble = 0, ev_other = 0, total_gop_votes = 0, total_dem_votes = 0, total_ind_votes = 0, total_votes = 0;
 
       data.features.forEach(f => {
         const props = f.properties;
@@ -121,8 +121,8 @@
         total_votes += total;
 
         if (reporting === 100) {
-          if (props.status === 'GOP Win') ev_johnson += +props.electoral_votes;
-          else if (props.status === 'DEM Win') ev_underwood += +props.electoral_votes;
+          if (props.status === 'GOP Win') ev_callahan += +props.electoral_votes;
+          else if (props.status === 'DEM Win') ev_noble += +props.electoral_votes;
           else if (props.status === 'IND Win') ev_other += +props.electoral_votes;
         }
       });
@@ -132,14 +132,14 @@
       const perc_dem = ((total_dem_votes / total_registered) * 100).toFixed(1);
       const reporting_pct = Math.round((total_votes / total_registered) * 100);
 
-      document.getElementById('johnson-votes').textContent = ev_johnson;
-      document.getElementById('underwood-votes').textContent = ev_underwood;
-      document.getElementById('johnson-bar').style.width = `${(ev_johnson / 538) * 100}%`;
-      document.getElementById('underwood-bar').style.width = `${(ev_underwood / 538) * 100}%`;
-      document.getElementById('johnson-label').textContent = ev_johnson;
-      document.getElementById('underwood-label').textContent = ev_underwood;
-      document.getElementById('johnson-pv').textContent = `Johnson: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
-      document.getElementById('underwood-pv').textContent = `Underwood: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
+      document.getElementById('callahan-votes').textContent = ev_callahan;
+      document.getElementById('noble-votes').textContent = ev_noble;
+      document.getElementById('callahan-bar').style.width = `${(ev_callahan / 538) * 100}%`;
+      document.getElementById('noble-bar').style.width = `${(ev_noble / 538) * 100}%`;
+      document.getElementById('callahan-label').textContent = ev_callahan;
+      document.getElementById('noble-label').textContent = ev_noble;
+      document.getElementById('callahan-pv').textContent = `Callahan: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
+      document.getElementById('noble-pv').textContent = `Noble: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
       document.getElementById('reporting').textContent = `Reporting: ${reporting_pct}%`;
 
       map.addSource('states', { type: 'geojson', data: data });
@@ -188,8 +188,8 @@
         const indPerc = total > 0 ? ((ind / total) * 100).toFixed(1) : 0;
         const winner = p.winner === 'UNKNOWN' ? 'Uncalled' : p.winner;
 
-        const gopName = p.gop_candidate || 'Johnson';
-        const demName = p.dem_candidate || 'Underwood';
+        const gopName = p.gop_candidate || 'Callahan';
+        const demName = p.dem_candidate || 'Noble';
         const indName = p.ind_candidate || 'Other';
         const gopCheck = winner === gopName ? '✓ ' : '';
         const demCheck = winner === demName ? '✓ ' : '';

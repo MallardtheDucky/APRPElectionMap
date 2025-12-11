@@ -1,226 +1,742 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>2000 Live Election Map</title>
+  <meta charset="utf-8" />
+  <title>2012 Live Election Command Center</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  
+  <!-- Mapbox GL JS -->
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.js"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.css" rel="stylesheet" />
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Confetti for Winner -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
   <style>
-    body { margin: 0; padding: 0; font-family: sans-serif; }
-    #map { position: absolute; top: 160px; bottom: 0; width: 100%; }
+    :root {
+      --gop-color: #e74c3c; 
+      --dem-color: #3498db; 
+      --ind-color: #9b59b6;
+      --gop-light: #fdeded; 
+      --dem-light: #eaf2f8;
+      
+      --dark-bg: #0f172a; 
+      --panel-bg: rgba(31, 41, 55, 0.85);
+      --border-color: rgba(255,255,255,0.1);
+      
+      --text-light: #f9fafb; 
+      --text-muted: #9ca3af; 
+      
+      --winner-bg: #22c55e;
+      --glass-blur: blur(12px);
+    }
+
+    body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; background-color: var(--dark-bg); color: var(--text-light); overflow: hidden; }
+
+    /* --- LAYOUT UTILS --- */
+    .hidden { display: none !important; }
+    .flex-center { display: flex; align-items: center; justify-content: center; }
+    
+    /* --- LOADER --- */
+    #loader { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 3000; transition: opacity 0.5s ease; }
+    .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: var(--dem-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    /* --- MAP --- */
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 0; }
+
+    /* --- HEADER (GLASSMORPHISM) --- */
     #header {
       position: absolute; top: 0; left: 0; right: 0;
-      background: #222; color: white; padding: 15px 20px;
-      z-index: 1000; display: flex; flex-direction: column; align-items: center;
+      background: var(--panel-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      padding: 12px 20px;
+      z-index: 1000;
+      display: flex; flex-direction: column; align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      transition: all 0.3s ease;
     }
-    .progress-container { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 10px; }
-    .progress-bar-wrapper {
-      display: flex; align-items: center; position: relative;
-      width: 100%; height: 20px; background: #444; border-radius: 10px; overflow: hidden;
+
+    .top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px; }
+    .title-group { display: flex; align-items: center; gap: 10px; }
+    .title { font-size: 20px; font-weight: 900; letter-spacing: -0.5px; background: linear-gradient(to right, #fff, #9ca3af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .live-badge { background: #ef4444; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    .header-controls { display: flex; gap: 10px; }
+    .btn-icon { background: rgba(255,255,255,0.1); border: none; color: white; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
+    .btn-icon:hover { background: rgba(255,255,255,0.2); }
+
+    /* --- PROGRESS BAR --- */
+    .progress-container { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 6px; }
+    .progress-bar-container { display: flex; align-items: center; width: 100%; gap: 12px; }
+    .candidate-image { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s; }
+    .candidate-image:hover { transform: scale(1.1); }
+    
+    .progress-bar-wrapper { position: relative; width: 100%; height: 28px; background: rgba(0,0,0,0.3); border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+    .progress-bar { position: absolute; top: 0; height: 100%; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+    .progress-bar.gop { left: 0; background: linear-gradient(90deg, #c0392b, #e74c3c); }
+    .progress-bar.dem { right: 0; background: linear-gradient(90deg, #3498db, #2980b9); }
+
+    .threshold-marker { position: absolute; left: calc(270 / 538 * 100%); width: 2px; height: 100%; background: rgba(255,255,255,0.8); z-index: 10; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+    .threshold-label { position: absolute; top: 50%; left: calc(270 / 538 * 100%); transform: translate(-50%, -50%); color: #fff; font-size: 10px; font-weight: 800; z-index: 11; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(0,0,0,0.4); padding: 2px 4px; border-radius: 4px; }
+
+    .bar-label { position: absolute; top: 50%; transform: translateY(-50%); font-weight: 800; font-size: 14px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none; z-index: 20; }
+    .bar-label.gop { text-align: right; } 
+    .bar-label.dem { text-align: left; }
+
+    .candidate-stats { display: flex; justify-content: space-between; width: 100%; font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    .stat-group { display: flex; gap: 15px; }
+
+    /* --- SIDEBAR (NEW) --- */
+    #sidebar {
+      position: absolute; top: 0; right: -320px; bottom: 35px; width: 300px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      z-index: 2000;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-left: 1px solid var(--border-color);
+      display: flex; flex-direction: column;
+      box-shadow: -5px 0 20px rgba(0,0,0,0.5);
     }
-    .progress-bar { height: 100%; transition: width 0.5s ease-in-out; }
-    .progress-bar.callahan { background: #e74c3c; }
-    .progress-bar.noble { background: #3498db; position: absolute; right: 0; }
-    .vote-label {
-      position: absolute; color: white; font-size: 12px;
-      font-weight: bold; text-shadow: 0 0 2px rgba(0,0,0,0.7);
+    #sidebar.open { right: 0; }
+    
+    .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); }
+    .sidebar-title { font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .close-sidebar { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; }
+    
+    .search-container { padding: 10px 15px; border-bottom: 1px solid var(--border-color); }
+    .search-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; color: white; font-family: inherit; font-size: 13px; outline: none; }
+    .search-input:focus { border-color: var(--dem-color); }
+
+    .state-list { flex-grow: 1; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+    .state-list::-webkit-scrollbar { width: 6px; }
+    .state-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    
+    .state-item { padding: 12px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: space-between; }
+    .state-item:hover { background: rgba(255,255,255,0.05); }
+    .state-info { display: flex; flex-direction: column; }
+    .state-name { font-weight: 600; font-size: 14px; }
+    .state-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .state-margin { font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 4px; width: 50px; text-align: center; }
+    .margin-gop { background: rgba(231, 76, 60, 0.2); color: #ffadad; }
+    .margin-dem { background: rgba(52, 152, 219, 0.2); color: #aed6f1; }
+    .margin-tossup { background: rgba(149, 165, 166, 0.2); color: #d0d3d4; }
+
+    /* --- LEGEND (Updated) --- */
+    #legend-btn { position: absolute; bottom: 50px; left: 15px; z-index: 1000; font-size: 12px; background: var(--panel-bg); color: white; border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; cursor: pointer; backdrop-filter: var(--glass-blur); }
+    
+    #legend-panel {
+      position: absolute; bottom: 90px; left: 15px; width: 160px;
+      background: var(--panel-bg); backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color); border-radius: 8px;
+      padding: 12px; z-index: 1000; font-size: 11px;
+      transform: translateY(20px); opacity: 0; pointer-events: none; transition: all 0.2s;
     }
-    .threshold-marker {
-      position: absolute; left: calc(270 / 538 * 100%);
-      width: 2px; height: 100%; background: #fff; z-index: 10;
+    #legend-panel.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+    .legend-item { display: flex; align-items: center; margin-bottom: 5px; color: var(--text-muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
+
+    /* --- WINNER BANNER --- */
+    #winner-banner {
+      position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+      background: var(--winner-bg); color: #fff;
+      padding: 10px 40px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+      font-size: 16px; font-weight: 900; letter-spacing: 1px;
+      z-index: 1500; transition: top 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 10px 30px rgba(39, 174, 96, 0.4); text-transform: uppercase;
+      display: flex; align-items: center; gap: 10px;
     }
-    .threshold-label {
-      position: relative; left: calc(270 / 538 * 100% - 20px);
-      color: white; font-size: 12px; font-weight: bold;
-      margin-bottom: 5px; text-align: left;
+
+    /* --- TICKER --- */
+    #ticker-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 35px;
+      background: #0f172a; border-top: 1px solid var(--border-color);
+      display: flex; align-items: center; z-index: 1000; overflow: hidden;
     }
-    .candidate-labels {
-      display: flex; justify-content: space-between;
-      font-size: 14px; font-weight: bold; margin-bottom: 5px;
-    }
-    .stat-box { margin-top: 5px; font-size: 12px; }
-    .candidate-image {
-      width: 70px; height: 70px; border-radius: 50%; object-fit: cover;
-    }
-    .progress-bar-container {
-      display: flex; align-items: center; width: 100%; gap: 15px;
-    }
-    .candidate-stats {
-      display: flex; justify-content: space-between;
-      width: 100%; max-width: 800px; font-size: 12px;
-    }
-    .candidate-stat-left, .candidate-stat-right {
-      text-align: center; width: 150px;
-    }
-    .title {
-      font-size: 30px; font-weight: bold; margin-bottom: 10px;
+    .ticker-label { background: var(--gop-color); color: white; padding: 0 15px; height: 100%; display: flex; align-items: center; font-weight: 800; font-size: 12px; flex-shrink: 0; z-index: 2; box-shadow: 5px 0 10px rgba(0,0,0,0.3); }
+    .ticker-content { display: flex; white-space: nowrap; animation: ticker 40s linear infinite; padding-left: 20px; }
+    .ticker-item { margin-right: 40px; font-size: 13px; color: #cbd5e1; display: inline-flex; align-items: center; gap: 6px; }
+    @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+    /* --- POPUPS --- */
+    .mapboxgl-popup-content { background: rgba(15, 23, 42, 0.95) !important; color: white !important; padding: 0 !important; border-radius: 12px !important; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important; backdrop-filter: blur(10px); }
+    .mapboxgl-popup-close-button { color: white; font-size: 18px; padding: 8px 12px; outline: none; }
+    .popup-header { background: rgba(255,255,255,0.05); padding: 12px 16px; border-bottom: 1px solid var(--border-color); border-radius: 12px 12px 0 0; }
+    .popup-header h3 { margin: 0; font-size: 18px; font-weight: 800; }
+    .popup-body { padding: 16px; }
+
+    .candidate-row { display: flex; align-items: center; padding: 8px; border-radius: 8px; margin-bottom: 6px; background: rgba(255,255,255,0.02); }
+    .candidate-row.winner { background: linear-gradient(90deg, rgba(39, 174, 96, 0.2), rgba(39, 174, 96, 0.05)); border: 1px solid rgba(39, 174, 96, 0.4); }
+    .candidate-row img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 10px; }
+    
+    /* Triangle Chart Styles */
+    .triangle-container { padding: 12px; background: rgba(0,0,0,0.2); text-align: center; border-radius: 0 0 12px 12px; }
+    .triangle-chart { width: 80px; height: 70px; margin: 10px auto; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); background: linear-gradient(to right, var(--gop-color), var(--dem-color)); position: relative; }
+    .triangle-dot { width: 8px; height: 8px; background: white; border-radius: 50%; position: absolute; box-shadow: 0 0 4px rgba(0,0,0,0.8); border: 1px solid black; }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .title { font-size: 16px; }
+      .candidate-image { width: 36px; height: 36px; }
+      #sidebar { width: 100%; right: -100%; }
+      #header { padding: 8px 10px; }
+      #map { top: 0; } /* Let map go behind header */
+      #winner-banner { width: 90%; font-size: 14px; padding: 10px; border-radius: 0 0 12px 12px; }
     }
   </style>
 </head>
 <body>
-<div id="header">
-  <div class="title">2000 Live Election Map</div>
-  <div class="progress-container">
-    <div class="candidate-labels">
-      <span>Callahan: <span id="callahan-votes">0</span></span>
-      <span>Noble: <span id="noble-votes">0</span></span>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <div style="font-weight:600; font-size:18px;">INITIALIZING DATA FEED...</div>
+  </div>
+
+  <!-- Winner Banner -->
+  <div id="winner-banner"><i class="fas fa-check-circle"></i> <span id="winner-text"></span></div>
+
+  <!-- Main Header -->
+  <div id="header">
+    <div class="top-row">
+      <div class="title-group">
+        <div class="live-badge">LIVE</div>
+        <div class="title">2012 ELECTION CENTER</div>
+      </div>
+      <div class="header-controls">
+        <button class="btn-icon" onclick="resetMap()" title="Reset View"><i class="fas fa-compress-arrows-alt"></i></button>
+        <button class="btn-icon" onclick="refreshData()" title="Refresh Data"><i class="fas fa-sync-alt"></i></button>
+        <button class="btn-icon" onclick="toggleSidebar()" title="State List"><i class="fas fa-bars"></i></button>
+      </div>
     </div>
-    <div class="progress-bar-container">
-      <img src="images/robertcallahan.png" alt="Callahan" class="candidate-image">
-      <div style="width: 100%; position: relative;">
-        <div class="threshold-label">270 to Win</div>
-        <div class="progress-bar-wrapper">
-          <div class="threshold-marker"></div>
-          <div class="progress-bar callahan" id="callahan-bar" style="width: 0%"></div>
-          <div class="progress-bar noble" id="noble-bar" style="width: 0%"></div>
-          <div class="vote-label" id="callahan-label" style="left: 5px">0</div>
-          <div class="vote-label" id="noble-label" style="right: 5px">0</div>
+
+    <!-- Progress Bar Section -->
+    <div class="progress-container">
+      <div class="progress-bar-container">
+        <img src="images/austinwarner2.jpg" class="candidate-image" alt="Warner" onerror="this.src='https://placehold.co/50x50/e74c3c/FFF?text=GOP'" />
+        
+        <div style="width:100%; position:relative;">
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar gop"></div>
+            <div class="progress-bar dem"></div>
+            <div class="threshold-marker"></div>
+          </div>
+          <!-- Floating Labels injected by JS -->
+        </div>
+
+        <img src="images/Barack-Obama.webp" class="candidate-image" alt="Obama" onerror="this.src='https://placehold.co/50x50/3498db/FFF?text=DEM'" />
+      </div>
+
+      <div class="candidate-stats">
+        <div class="stat-group">
+          <span style="color:var(--gop-color)">Warner: <span id="Warner-votes" style="font-weight:bold; font-size:14px;">0</span></span>
+          <span id="Warner-pv" style="font-size:11px; align-self:center;">0 (0%)</span>
+        </div>
+        <div style="font-size:10px; font-weight:700; color:#fff; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px;">
+          <span id="reporting">0% IN</span>
+        </div>
+        <div class="stat-group" style="justify-content:flex-end;">
+          <span id="Obama-pv" style="font-size:11px; align-self:center;">0 (0%)</span>
+          <span style="color:var(--dem-color)">Obama: <span id="Obama-votes" style="font-weight:bold; font-size:14px;">0</span></span>
         </div>
       </div>
-      <img src="images/elainenoble.png" alt="Noble" class="candidate-image">
     </div>
   </div>
-  <div class="candidate-stats">
-    <div class="candidate-stat-left" id="callahan-pv">Callahan: 0 (0%)</div>
-    <div class="stat-box" id="reporting">Reporting: 0%</div>
-    <div class="candidate-stat-right" id="noble-pv">Noble: 0 (0%)</div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">State Results</span>
+      <button class="close-sidebar" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="search-container">
+      <input type="text" id="state-search" class="search-input" placeholder="Search state (e.g., Ohio)..." onkeyup="filterStates()" />
+    </div>
+    <ul class="state-list" id="state-list-ul">
+      <!-- State items injected here -->
+    </ul>
   </div>
-</div>
-<div id="map"></div>
-<script>
-  mapboxgl.accessToken = 'pk.eyJ1IjoiNW00Y2s3NyIsImEiOiJjbWI4eXFqeDkwbzY1MmpwcDFzZDIwMmVqIn0.6JGe7JWhk28z5D3TLIJQwg';
 
-  const map = new mapboxgl.Map({
-    container: 'map',
-    style: 'mapbox://styles/mapbox/light-v10',
-    center: [-98.5795, 39.8283],
-    zoom: 3
-  });
+  <!-- Map Container -->
+  <div id="map"></div>
 
-  map.on('load', async () => {
-    try {
-      const res = await fetch('https://script.google.com/macros/s/AKfycbzxzzJT-mqKYsVLtanqrw4Utugnf206W2nH_chk6FozzC1gs5gdxsZxHAD-sJ9fI5mlAg/exec');
-      const data = await res.json();
+  <!-- Floating Legend Button & Panel -->
+  <button id="legend-btn" onclick="toggleLegend()"><i class="fas fa-map"></i> Legend</button>
+  <div id="legend-panel">
+    <div style="font-weight:700; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px;">ELECTORAL MARGIN</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#c0392b"></span> Solid GOP (>10%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#e74c3c"></span> Likely GOP (5-10%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#f1948a"></span> Lean GOP (2-5%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#fadbd8"></span> Tilt GOP (&lt;2%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#d6eaf8"></span> Tilt DEM (&lt;2%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#85c1e9"></span> Lean DEM (2-5%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#3498db"></span> Likely DEM (5-10%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#2980b9"></span> Solid DEM (>10%)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#95a5a6"></span> Tossup</div>
+  </div>
 
-      let ev_callahan = 0, ev_noble = 0, ev_other = 0, total_gop_votes = 0, total_dem_votes = 0, total_ind_votes = 0, total_votes = 0;
+  <!-- News Ticker -->
+  <div id="ticker-bar">
+    <div class="ticker-label">KEY RACES</div>
+    <div class="ticker-wrap" style="flex:1; overflow:hidden;">
+      <div class="ticker-content" id="ticker-content">
+        <!-- Ticker items -->
+      </div>
+    </div>
+  </div>
 
-      data.features.forEach(f => {
-        const props = f.properties;
-        if (props.abbr === 'PR') return;
+  <script>
+    // --- Constants ---
+    const CANDIDATE_GOP = 'Austin Warner';
+    const CANDIDATE_DEM = 'Barack Obama';
+    const WIN_NUMBER = 270;
+    const TOTAL_EV = 538;
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbxlRKkvfnPR64htpWO537PlcF_cUj6v6lAu6w8zsJGOcn0XfVf6jLsY1lc6D07rNTN5cA/exec';
+    
+    // --- State ---
+    let electionGeoJSON = null;
+    let isWinnerDeclared = false;
 
-        const gop = +props.votes_gop || 0;
-        const dem = +props.votes_dem || 0;
-        const ind = +props.votes_ind || 0;
-        const reporting = +props.reporting || 0;
-        const total = gop + dem + ind;
+    // --- DOM Elements ---
+    const loader = document.getElementById('loader');
+    const winnerBanner = document.getElementById('winner-banner');
+    const winnerText = document.getElementById('winner-text');
+    const sidebar = document.getElementById('sidebar');
+    const stateListUl = document.getElementById('state-list-ul');
+    const tickerContent = document.getElementById('ticker-content');
+    
+    // Mapbox Setup
+    mapboxgl.accessToken = 'pk.eyJ1IjoiNW00Y2s3NyIsImEiOiJjbWI4eXFqeDkwbzY1MmpwcDFzZDIwMmVqIn0.6JGe7JWhk28z5D3TLIJQwg';
 
-        total_gop_votes += gop;
-        total_dem_votes += dem;
-        total_ind_votes += ind;
-        total_votes += total;
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v10',
+      center: [-98.5, 39.8],
+      zoom: 3.5,
+      attributionControl: false
+    });
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-        if (reporting === 100) {
-          if (props.status === 'GOP Win') ev_callahan += +props.electoral_votes;
-          else if (props.status === 'DEM Win') ev_noble += +props.electoral_votes;
-          else if (props.status === 'IND Win') ev_other += +props.electoral_votes;
-        }
+    // --- Init ---
+    map.on('load', async () => {
+      await refreshData();
+      
+      // Hide loader with fade
+      loader.style.opacity = '0';
+      setTimeout(() => loader.style.display = 'none', 500);
+      
+      // Setup hover effect
+      const hoverPopup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: 'hover-popup' });
+      
+      map.on('mousemove', 'states-fill', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const p = e.features[0].properties;
+        hoverPopup.setLngLat(e.lngLat)
+          .setHTML(`<div style="padding:4px; font-weight:bold; color:black; font-size:12px;">${p.NAME}</div>`)
+          .addTo(map);
+      });
+      
+      map.on('mouseleave', 'states-fill', () => {
+        map.getCanvas().style.cursor = '';
+        hoverPopup.remove();
       });
 
-      const total_registered = 104335048;
-      const perc_gop = ((total_gop_votes / total_registered) * 100).toFixed(1);
-      const perc_dem = ((total_dem_votes / total_registered) * 100).toFixed(1);
-      const reporting_pct = Math.round((total_votes / total_registered) * 100);
-
-      document.getElementById('callahan-votes').textContent = ev_callahan;
-      document.getElementById('noble-votes').textContent = ev_noble;
-      document.getElementById('callahan-bar').style.width = `${(ev_callahan / 538) * 100}%`;
-      document.getElementById('noble-bar').style.width = `${(ev_noble / 538) * 100}%`;
-      document.getElementById('callahan-label').textContent = ev_callahan;
-      document.getElementById('noble-label').textContent = ev_noble;
-      document.getElementById('callahan-pv').textContent = `Callahan: ${total_gop_votes.toLocaleString()} (${perc_gop}%)`;
-      document.getElementById('noble-pv').textContent = `Noble: ${total_dem_votes.toLocaleString()} (${perc_dem}%)`;
-      document.getElementById('reporting').textContent = `Reporting: ${reporting_pct}%`;
-
-      map.addSource('states', { type: 'geojson', data: data });
-
-      map.addLayer({
-        id: 'states-fill',
-        type: 'fill',
-        source: 'states',
-        paint: {
-          'fill-color': [
-            'match',
-            ['get', 'status'],
-            'GOP Win', '#d12c0f',
-            'DEM Win', '#0e47e6',
-            'IND Win', '#d900d9',
-            'Lean GOP', '#f4a6a6',
-            'Lean DEM', '#a6c8f4',
-            'Lean IND', '#ffb2ff',
-            'Uncalled', '#cccccc',
-            '#ffffff'
-          ],
-          'fill-opacity': 1.0
-        }
-      });
-
-      map.addLayer({
-        id: 'states-outline',
-        type: 'line',
-        source: 'states',
-        paint: {
-          'line-color': '#000000',
-          'line-width': 2
-        }
-      });
-
+      // Click for details
       map.on('click', 'states-fill', (e) => {
         const p = e.features[0].properties;
+        const coordinates = e.lngLat;
+        new mapboxgl.Popup({ offset: 25 })
+          .setLngLat(coordinates)
+          .setHTML(createPopupHTML(p))
+          .addTo(map);
+      });
+    });
+
+    // --- Main Logic ---
+
+    async function refreshData() {
+      const icon = document.querySelector('.fa-sync-alt');
+      if(icon) icon.classList.add('fa-spin');
+      
+      try {
+        const res = await fetch(DATA_URL);
+        const data = await res.json();
+        electionGeoJSON = data;
+        
+        processData(data);
+        
+        // Update Map Source
+        if (map.getSource('states')) {
+          map.getSource('states').setData(data);
+        } else {
+          initMapLayers(data);
+        }
+
+      } catch (err) {
+        console.error("Data Load Error", err);
+        alert("Failed to load election data. Please check connection.");
+      } finally {
+        if(icon) setTimeout(() => icon.classList.remove('fa-spin'), 1000);
+      }
+    }
+
+    function processData(data) {
+      let gopEV = 0, demEV = 0;
+      let gopPV = 0, demPV = 0, totalPV = 0;
+      let totalExpected = 0;
+
+      const stateListItems = [];
+
+      data.features.forEach(f => {
+        const p = f.properties;
+        if(p.abbr === 'PR') return; // Skip PR
 
         const gop = +p.votes_gop || 0;
         const dem = +p.votes_dem || 0;
         const ind = +p.votes_ind || 0;
         const total = gop + dem + ind;
+        const reporting = +p.reporting || 0;
 
-        const gopPerc = total > 0 ? ((gop / total) * 100).toFixed(1) : 0;
-        const demPerc = total > 0 ? ((dem / total) * 100).toFixed(1) : 0;
-        const indPerc = total > 0 ? ((ind / total) * 100).toFixed(1) : 0;
-        const winner = p.winner === 'UNKNOWN' ? 'Uncalled' : p.winner;
+        // Calc Nationals
+        gopPV += gop; demPV += dem; totalPV += total;
+        
+        // Estimate total ballots based on reporting
+        const stateExpected = reporting > 0 ? (total / (reporting/100)) : 0;
+        totalExpected += stateExpected;
 
-        const gopName = p.gop_candidate || 'Callahan';
-        const demName = p.dem_candidate || 'Noble';
-        const indName = p.ind_candidate || 'Other';
-        const gopCheck = winner === gopName ? '✓ ' : '';
-        const demCheck = winner === demName ? '✓ ' : '';
-        const indCheck = winner === indName ? '✓ ' : '';
+        // Determine Status
+        let status = 'Uncalled';
+        let leader = 'Tossup';
+        let margin = 0;
 
-        new mapboxgl.Popup()
-          .setLngLat(e.lngLat)
-          .setHTML(`
-            <strong>${p.NAME}</strong><br/>
-            <b>Electoral Votes:</b> ${p.electoral_votes}<br/>
-            <b>Reporting:</b> ${p.reporting}%<br/>
-            <b style="color:#d12c0f;">${gopCheck}${gopName}:</b> ${gop.toLocaleString()} (${gopPerc}%)<br/>
-            <b style="color:#0e47e6;">${demCheck}${demName}:</b> ${dem.toLocaleString()} (${demPerc}%)<br/>
-            <b style="color:#d900d9;">${indCheck}${indName} (${p.ind_party || 'Independent'}):</b> ${ind.toLocaleString()} (${indPerc}%)<br/>
-            <b>Winner:</b> ${winner}
-          `)
-          .addTo(map);
+        if (total > 0) {
+           margin = (Math.abs(gop - dem) / total);
+           if (gop > dem) leader = 'GOP';
+           if (dem > gop) leader = 'DEM';
+
+           if (reporting === 100) {
+             status = `Solid ${leader}`;
+           } else {
+             if (margin >= 0.1) status = `Solid ${leader}`;
+             else if (margin >= 0.05) status = `Likely ${leader}`;
+             else if (margin >= 0.02) status = `Lean ${leader}`;
+             else status = `Tilt ${leader}`;
+             if (margin === 0) status = 'Tossup';
+           }
+        }
+
+        p.status = status; // Save back to properties for map styling
+
+        // EV Count
+        if (reporting === 100) {
+          if (gop > dem) gopEV += +p.electoral_votes;
+          else if (dem > gop) demEV += +p.electoral_votes;
+        }
+
+        // List Item Data
+        stateListItems.push({
+          name: p.NAME,
+          margin: total > 0 ? margin : 999, // 999 to put unstarted at bottom
+          leader: leader,
+          reporting: reporting,
+          gopV: gop, demV: dem,
+          coordinates: f.geometry // rough center for flying
+        });
       });
 
-      map.on('mouseenter', 'states-fill', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'states-fill', () => {
-        map.getCanvas().style.cursor = '';
-      });
+      // Update Header
+      updateHeader(gopEV, demEV, gopPV, demPV, totalPV, totalExpected);
 
-    } catch (error) {
-      console.error('Map load error:', error);
-      document.getElementById('map').innerHTML = '<p style="color: red; text-align: center;">Failed to load map. Please check data source or internet connection.</p>';
+      // Check Winner
+      checkWinner(gopEV, demEV);
+
+      // Populate Sidebar
+      populateSidebar(stateListItems);
+
+      // Populate Ticker
+      populateTicker(stateListItems);
     }
-  });
-</script>
+
+    function initMapLayers(data) {
+      map.addSource('states', { type: 'geojson', data: data });
+      
+      map.addLayer({
+        id: 'states-fill', type: 'fill', source: 'states',
+        paint: {
+          'fill-color': [
+            'match', ['get', 'status'],
+            'Solid GOP', '#c0392b',
+            'Likely GOP', '#e74c3c',
+            'Lean GOP', '#f1948a',
+            'Tilt GOP', '#fadbd8',
+            'Solid DEM', '#2980b9',
+            'Likely DEM', '#3498db',
+            'Lean DEM', '#85c1e9',
+            'Tilt DEM', '#d6eaf8',
+            'Tossup', '#95a5a6',
+            'Uncalled', '#34495e',
+            '#34495e' // default
+          ],
+          'fill-opacity': 0.8
+        }
+      });
+
+      map.addLayer({
+        id: 'states-line', type: 'line', source: 'states',
+        paint: { 'line-color': 'rgba(255,255,255,0.3)', 'line-width': 1 }
+      });
+      
+      // Add heavy border for hover state? 
+      // Simplified: Just keep basic white lines
+    }
+
+    // --- UI Updaters ---
+
+    function updateHeader(gopEV, demEV, gopPV, demPV, totalPV, totalExpected) {
+      // 1. Numbers
+      animateValue("Warner-votes", +document.getElementById("Warner-votes").innerText, gopEV, 1000);
+      animateValue("Obama-votes", +document.getElementById("Obama-votes").innerText, demEV, 1000);
+
+      const gopPVPct = totalPV ? ((gopPV/totalPV)*100).toFixed(1) : 0;
+      const demPVPct = totalPV ? ((demPV/totalPV)*100).toFixed(1) : 0;
+      
+      document.getElementById("Warner-pv").innerText = `Warner: ${gopPV.toLocaleString()} (${gopPVPct}%)`;
+      document.getElementById("Obama-pv").innerText = `Obama: ${demPV.toLocaleString()} (${demPVPct}%)`;
+      
+      const reportingPct = totalExpected ? Math.min(100, (totalPV/totalExpected)*100).toFixed(1) : 0;
+      document.getElementById("reporting").innerText = `${reportingPct}% REPORTING`;
+
+      // 2. Progress Bars
+      const gopWidth = (gopEV / TOTAL_EV) * 100;
+      const demWidth = (demEV / TOTAL_EV) * 100;
+      
+      document.querySelector('.progress-bar.gop').style.width = `${gopWidth}%`;
+      document.querySelector('.progress-bar.dem').style.width = `${demWidth}%`;
+
+      // 3. Floating Labels (Create or Update)
+      const wrapper = document.querySelector('.progress-bar-wrapper');
+      
+      let gopLbl = wrapper.querySelector('.bar-label.gop');
+      if(!gopLbl) { gopLbl = document.createElement('div'); gopLbl.className='bar-label gop'; wrapper.appendChild(gopLbl); }
+      gopLbl.innerText = gopEV;
+      gopLbl.style.left = `calc(${gopWidth}% - 10px)`; // Position inside red
+      if(gopEV < 20) gopLbl.style.display = 'none'; else gopLbl.style.display = 'block';
+
+      let demLbl = wrapper.querySelector('.bar-label.dem');
+      if(!demLbl) { demLbl = document.createElement('div'); demLbl.className='bar-label dem'; wrapper.appendChild(demLbl); }
+      demLbl.innerText = demEV;
+      demLbl.style.left = `calc(100% - ${demWidth}% + 10px)`; // Position inside blue
+      if(demEV < 20) demLbl.style.display = 'none'; else demLbl.style.display = 'block';
+    }
+
+    function populateSidebar(states) {
+      // Sort: Battlegrounds first (margin asc), then alphabetical
+      states.sort((a,b) => a.margin - b.margin);
+      
+      stateListUl.innerHTML = '';
+      states.forEach(s => {
+        let marginClass = 'margin-tossup';
+        let marginTxt = 'TIED';
+        if(s.leader === 'GOP') marginClass = 'margin-gop';
+        if(s.leader === 'DEM') marginClass = 'margin-dem';
+        
+        if (s.margin !== 999) marginTxt = `+${(s.margin*100).toFixed(1)}%`;
+        else marginTxt = '--';
+
+        const li = document.createElement('li');
+        li.className = 'state-item';
+        li.dataset.name = s.name.toLowerCase(); // For search
+        li.innerHTML = `
+          <div class="state-info">
+            <span class="state-name">${s.name}</span>
+            <span class="state-meta">${s.reporting}% In • ${s.leader === 'Tossup' ? 'Tossup' : s.leader + ' Leads'}</span>
+          </div>
+          <div class="state-margin ${marginClass}">${marginTxt}</div>
+        `;
+        li.onclick = () => {
+          // Find full feature to fly to
+          const feat = electionGeoJSON.features.find(f => f.properties.NAME === s.name);
+          if(feat) {
+             // Calculate centroid roughly (Mapbox flyTo needs center)
+             // Simple fallback: if geometry is Polygon, take first coord. 
+             // Ideally we use turf.centroid, but avoiding extra libs.
+             // We'll rely on Mapbox bounds for Polygon.
+             
+             // Quick hack for bounding box since we don't have centroid util
+             const bounds = new mapboxgl.LngLatBounds();
+             const coords = feat.geometry.type === 'MultiPolygon' 
+                ? feat.geometry.coordinates.flat(2) 
+                : feat.geometry.coordinates.flat(1);
+             
+             coords.forEach(c => bounds.extend(c));
+             map.fitBounds(bounds, { padding: 100 });
+             
+             if(window.innerWidth < 600) toggleSidebar(); // close on mobile
+          }
+        };
+        stateListUl.appendChild(li);
+      });
+    }
+
+    function populateTicker(states) {
+      // Filter for closest races (< 5%)
+      const closeRaces = states.filter(s => s.margin < 0.05 && s.margin !== 999).slice(0, 15);
+      
+      const html = closeRaces.map(s => {
+        const color = s.leader === 'GOP' ? 'var(--gop-color)' : (s.leader === 'DEM' ? 'var(--dem-color)' : '#fff');
+        return `
+          <span class="ticker-item">
+            <span style="font-weight:700; color:${color}">${s.name}</span>
+            ${s.leader} +${(s.margin*100).toFixed(1)}%
+          </span>
+        `;
+      }).join('');
+      
+      // Double it for infinite loop illusion
+      tickerContent.innerHTML = html + html; 
+    }
+
+    function checkWinner(gop, dem) {
+      if (isWinnerDeclared) return; // Don't re-trigger
+      
+      let winnerName = "";
+      if (gop >= WIN_NUMBER) winnerName = CANDIDATE_GOP;
+      else if (dem >= WIN_NUMBER) winnerName = CANDIDATE_DEM;
+      
+      if (winnerName) {
+        isWinnerDeclared = true;
+        winnerText.innerText = `PROJECTED WINNER: ${winnerName}`;
+        winnerBanner.style.top = "0";
+        fireConfetti();
+        // Keep firing confetti every few secs
+        setInterval(fireConfetti, 3000);
+      }
+    }
+
+    function createPopupHTML(p) {
+      const gop = +p.votes_gop || 0;
+      const dem = +p.votes_dem || 0;
+      const ind = +p.votes_ind || 0;
+      const total = gop + dem + ind;
+
+      const gopPerc = total ? ((gop/total)*100).toFixed(1) : 0;
+      const demPerc = total ? ((dem/total)*100).toFixed(1) : 0;
+      const indPerc = total ? ((ind/total)*100).toFixed(1) : 0;
+
+      let winnerClassG = (gop > dem) ? 'winner' : '';
+      let winnerClassD = (dem > gop) ? 'winner' : '';
+
+      // Triangle Logic
+      const chartWidth = 80, chartHeight = 70;
+      let dotX = 40, dotY = 23; // default center-ish
+      if (total > 0) {
+        // Simple barycentric-ish projection for the visual
+        const margin = (dem - gop) / total; // -1 to 1
+        dotX = 40 + (margin * 40); // Move left/right
+        dotY = (ind/total) * 70; // Move up based on ind
+      }
+
+      return `
+        <div class="popup-header"><h3>${p.NAME}</h3><div style="font-size:12px;opacity:0.8">${p.electoral_votes} Electoral Votes</div></div>
+        <div class="popup-body">
+          <div class="candidate-row ${winnerClassG}">
+             <img src="images/austinwarner2.jpg" onerror="this.src='https://placehold.co/40x40/e74c3c/FFF?text=R'"/>
+             <div style="flex:1">
+               <div style="font-weight:700; font-size:14px; color:${winnerClassG?'#fff':'#ccc'}">Warner</div>
+               <div style="font-size:11px; opacity:0.7">${gop.toLocaleString()}</div>
+             </div>
+             <div style="font-weight:800; font-size:16px;">${gopPerc}%</div>
+          </div>
+          <div class="candidate-row ${winnerClassD}">
+             <img src="images/Barack-Obama.webp" onerror="this.src='https://placehold.co/40x40/3498db/FFF?text=D'"/>
+             <div style="flex:1">
+               <div style="font-weight:700; font-size:14px; color:${winnerClassD?'#fff':'#ccc'}">Obama</div>
+               <div style="font-size:11px; opacity:0.7">${dem.toLocaleString()}</div>
+             </div>
+             <div style="font-weight:800; font-size:16px;">${demPerc}%</div>
+          </div>
+          ${ind > 0 ? `
+          <div style="font-size:11px; text-align:center; margin-top:5px; opacity:0.6;">
+            Other: ${ind.toLocaleString()} (${indPerc}%)
+          </div>` : ''}
+          
+          <div class="triangle-container" style="margin-top:10px;">
+             <div style="font-size:10px; font-weight:700; letter-spacing:1px; margin-bottom:5px;">STATE LEAN</div>
+             <div style="position:relative; width:80px; margin:0 auto;">
+                <div style="font-size:9px; position:absolute; top:-15px; left:50%; transform:translateX(-50%); color:var(--ind-color)">IND</div>
+                <div class="triangle-chart">
+                   <div class="triangle-dot" style="left:${dotX}px; bottom:${dotY}px; transform:translate(-50%, 50%);"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:9px; font-weight:700; margin-top:-5px;">
+                   <span style="color:var(--gop-color)">GOP</span>
+                   <span style="color:var(--dem-color)">DEM</span>
+                </div>
+             </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- Helpers ---
+    function toggleSidebar() {
+      sidebar.classList.toggle('open');
+    }
+    
+    function toggleLegend() {
+      document.getElementById('legend-panel').classList.toggle('show');
+    }
+
+    function filterStates() {
+      const term = document.getElementById('state-search').value.toLowerCase();
+      const items = document.querySelectorAll('.state-item');
+      items.forEach(item => {
+        if(item.dataset.name.includes(term)) item.classList.remove('hidden');
+        else item.classList.add('hidden');
+      });
+    }
+
+    function resetMap() {
+      map.flyTo({ center: [-98.5, 39.8], zoom: 3.5 });
+    }
+
+    function animateValue(id, start, end, duration) {
+      if (start === end) return;
+      const obj = document.getElementById(id);
+      let startTimestamp = null;
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start).toLocaleString(); // Add commas
+        if (progress < 1) {
+          window.requestAnimationFrame(step);
+        }
+      };
+      window.requestAnimationFrame(step);
+    }
+
+    function fireConfetti() {
+      var count = 200;
+      var defaults = { origin: { y: 0.7 } };
+      function fire(particleRatio, opts) {
+        confetti(Object.assign({}, defaults, opts, {
+          particleCount: Math.floor(count * particleRatio)
+        }));
+      }
+      fire(0.25, { spread: 26, startVelocity: 55, colors:['#e74c3c','#3498db'] });
+      fire(0.2, { spread: 60 });
+      fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+      fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+      fire(0.1, { spread: 120, startVelocity: 45 });
+    }
+  </script>
 </body>
 </html>

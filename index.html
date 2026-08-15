@@ -997,17 +997,15 @@
   const TOTAL_EV = 538;
 
 
-  /*
-    LOCAL GEOJSON FILE
+  /* ============================================================
+     GOOGLE DRIVE GEOJSON
+  ============================================================ */
 
-    Put states.geojson in the SAME folder as index.html
+  const GEOJSON_FILE_ID =
+    '1TwkHOy_2RXONfo1yCZfNKlEs9zFtlA8y';
 
-    No Google Sheets.
-    No Apps Script.
-    No API token.
-  */
-
-  const GEOJSON_URL = 'https://drive.google.com/uc?export=download&id=1TwkHOy_2RXONfo1yCZfNKlEs9zFtlA8y';
+  const GEOJSON_URL =
+    `https://drive.google.com/uc?export=download&id=${GEOJSON_FILE_ID}`;
 
 
   /* ============================================================
@@ -1074,44 +1072,105 @@
      MAP LOAD
   ============================================================ */
 
-  map.on('load', async () => {
+  map.on('load', () => {
 
-    await loadLocalGeoJSON();
+    loadElectionData();
 
   });
 
 
   /* ============================================================
-     LOAD LOCAL GEOJSON
+     LOAD GEOJSON FROM GOOGLE DRIVE
   ============================================================ */
 
-  async function loadLocalGeoJSON() {
+  async function loadElectionData() {
 
     loader.style.display = 'flex';
-
     loader.style.opacity = '1';
 
-    loaderText.innerText =
-      'LOADING ELECTION MAP...';
+    loaderText.innerHTML = `
+      <div class="spinner"></div>
+      LOADING ELECTION MAP...
+    `;
 
 
     try {
 
+      console.log(
+        'Loading GeoJSON from:',
+        GEOJSON_URL
+      );
+
+
       const response =
-        await fetch(GEOJSON_URL);
+        await fetch(
+          GEOJSON_URL,
+          {
+            method: 'GET',
+            redirect: 'follow'
+          }
+        );
+
+
+      console.log(
+        'Response status:',
+        response.status
+      );
 
 
       if (!response.ok) {
 
         throw new Error(
-          `Could not load ${GEOJSON_URL}`
+          `Google Drive returned HTTP ${response.status}`
         );
 
       }
 
 
-      const data =
-        await response.json();
+      const text =
+        await response.text();
+
+
+      let data;
+
+
+      try {
+
+        data = JSON.parse(text);
+
+      }
+
+      catch (jsonError) {
+
+        console.error(
+          'Google Drive returned:',
+          text.substring(0, 500)
+        );
+
+
+        throw new Error(
+          'Google Drive did not return valid GeoJSON. Make sure the file is shared as "Anyone with the link".'
+        );
+
+      }
+
+
+      if (
+        !data ||
+        data.type !== 'FeatureCollection' ||
+        !Array.isArray(data.features)
+      ) {
+
+        throw new Error(
+          'The Google Drive file is not a valid GeoJSON FeatureCollection.'
+        );
+
+      }
+
+
+      console.log(
+        `Loaded ${data.features.length} GeoJSON features`
+      );
 
 
       electionGeoJSON = data;
@@ -1152,25 +1211,67 @@
     catch (error) {
 
       console.error(
-        'GeoJSON Load Error:',
+        'GEOJSON LOAD ERROR:',
         error
       );
 
 
+      loader.style.opacity = '1';
+
+
       loaderText.innerHTML = `
 
-        <strong>
-          FAILED TO LOAD states.geojson
+        <strong style="
+          color:#ff6b6b;
+          font-size:18px;
+        ">
+          FAILED TO LOAD GEOJSON
         </strong>
 
         <br><br>
 
-        Make sure your folder contains:
+        <div style="
+          max-width:500px;
+          text-align:center;
+          color:#ffffff;
+        ">
 
-        <br><br>
+          ${error.message}
 
-        index.html<br>
-        states.geojson
+        </div>
+
+        <br>
+
+        <div style="
+          max-width:500px;
+          text-align:center;
+          color:#9ca3af;
+          font-size:13px;
+        ">
+
+          This map is loading from Google Drive.
+
+          <br><br>
+
+          File ID:
+
+          <br>
+
+          <strong>
+            ${GEOJSON_FILE_ID}
+          </strong>
+
+          <br><br>
+
+          Make sure Google Drive sharing is set to:
+
+          <br><br>
+
+          <strong>
+            Anyone with the link → Viewer
+          </strong>
+
+        </div>
 
       `;
 
@@ -1179,12 +1280,9 @@
   }
 
 
-  /*
-    This keeps the refresh button.
-
-    But now it reloads states.geojson
-    instead of Google Sheets.
-  */
+  /* ============================================================
+     REFRESH DATA
+  ============================================================ */
 
   function refreshData() {
 
@@ -1199,7 +1297,7 @@
     }
 
 
-    loadLocalGeoJSON()
+    loadElectionData()
       .finally(() => {
 
         setTimeout(() => {
@@ -1333,25 +1431,13 @@
     data.features.forEach(feature => {
 
       const p =
-        feature.properties;
-
-
-      /*
-        Your GeoJSON should ideally contain:
-
-        NAME
-        abbr
-        votes_gop
-        votes_dem
-        votes_ind
-        reporting
-        electoral_votes
-      */
+        feature.properties || {};
 
 
       const name =
         p.NAME ||
         p.name ||
+        p.STATE_NAME ||
         'Unknown';
 
 
@@ -1465,24 +1551,10 @@
       }
 
 
-      /*
-        Save calculated data
-        directly into GeoJSON properties.
-      */
-
       p.status = status;
-
       p.leader = leader;
-
       p.margin = margin;
 
-
-      /*
-        Electoral Votes
-
-        Only counted once
-        the state reaches 100% reporting.
-      */
 
       if (reporting === 100) {
 
@@ -1527,19 +1599,12 @@
 
 
     updateHeader(
-
       gopEV,
-
       demEV,
-
       gopPV,
-
       demPV,
-
       totalPV,
-
       totalExpected
-
     );
 
 
@@ -1682,6 +1747,7 @@
         document
           .getElementById('Warner-votes')
           .innerText
+          .replace(/,/g, '')
       ),
       gopEV,
       600
@@ -1694,6 +1760,7 @@
         document
           .getElementById('Obama-votes')
           .innerText
+          .replace(/,/g, '')
       ),
       demEV,
       600
@@ -1717,32 +1784,27 @@
     document
       .getElementById('Warner-pv')
       .innerText =
-
       `${gopPV.toLocaleString()} (${gopPercent}%)`;
 
 
     document
       .getElementById('Obama-pv')
       .innerText =
-
       `${demPV.toLocaleString()} (${demPercent}%)`;
 
 
     const reportingPercent =
       totalExpected > 0
-
         ? Math.min(
             100,
             (totalPV / totalExpected) * 100
           ).toFixed(1)
-
         : '0.0';
 
 
     document
       .getElementById('reporting')
       .innerText =
-
       `${reportingPercent}% REPORTING`;
 
 
@@ -1758,7 +1820,6 @@
       .querySelector('.progress-bar.gop')
       .style
       .width =
-
       `${gopWidth}%`;
 
 
@@ -1766,7 +1827,6 @@
       .querySelector('.progress-bar.dem')
       .style
       .width =
-
       `${demWidth}%`;
 
   }
@@ -1793,9 +1853,7 @@
         'margin-tossup';
 
 
-      if (
-        state.leader === 'GOP'
-      ) {
+      if (state.leader === 'GOP') {
 
         marginClass =
           'margin-gop';
@@ -1803,9 +1861,7 @@
       }
 
 
-      if (
-        state.leader === 'DEM'
-      ) {
+      if (state.leader === 'DEM') {
 
         marginClass =
           'margin-dem';
@@ -1815,13 +1871,10 @@
 
       const marginText =
         state.margin === 999
-
           ? '--'
-
           : `+${
-              (
-                state.margin * 100
-              ).toFixed(1)
+              (state.margin * 100)
+                .toFixed(1)
             }%`;
 
 
@@ -1848,15 +1901,12 @@
           <span class="state-meta">
 
             ${state.reporting}% In
-
             •
-
             ${state.leader}
 
           </span>
 
         </div>
-
 
         <div class="
           state-margin
@@ -1904,7 +1954,8 @@
         f =>
           (
             f.properties.NAME ||
-            f.properties.name
+            f.properties.name ||
+            f.properties.STATE_NAME
           ) === name
       );
 
@@ -1933,9 +1984,7 @@
     );
 
 
-    if (
-      window.innerWidth < 600
-    ) {
+    if (window.innerWidth < 600) {
 
       toggleSidebar();
 
@@ -1943,11 +1992,6 @@
 
   }
 
-
-  /*
-    Works with both Polygon
-    and MultiPolygon GeoJSON.
-  */
 
   function extendBounds(
     bounds,
@@ -2000,9 +2044,7 @@
       let color = 'white';
 
 
-      if (
-        state.leader === 'GOP'
-      ) {
+      if (state.leader === 'GOP') {
 
         color =
           'var(--gop-color)';
@@ -2010,9 +2052,7 @@
       }
 
 
-      if (
-        state.leader === 'DEM'
-      ) {
+      if (state.leader === 'DEM') {
 
         color =
           'var(--dem-color)';
@@ -2024,9 +2064,7 @@
 
         <span class="ticker-item">
 
-          <strong style="
-            color:${color}
-          ">
+          <strong style="color:${color}">
 
             ${state.name}
 
@@ -2048,13 +2086,9 @@
     if (!html) {
 
       html = `
-
         <span class="ticker-item">
-
-          Waiting for election data...
-
+          Waiting for election results...
         </span>
-
       `;
 
     }
@@ -2075,21 +2109,15 @@
     demEV
   ) {
 
-    if (
-      isWinnerDeclared
-    ) {
-
+    if (isWinnerDeclared) {
       return;
-
     }
 
 
     let winner = null;
 
 
-    if (
-      gopEV >= WIN_NUMBER
-    ) {
+    if (gopEV >= WIN_NUMBER) {
 
       winner =
         CANDIDATE_GOP;
@@ -2097,9 +2125,7 @@
     }
 
 
-    if (
-      demEV >= WIN_NUMBER
-    ) {
+    if (demEV >= WIN_NUMBER) {
 
       winner =
         CANDIDATE_DEM;
@@ -2136,6 +2162,7 @@
     const name =
       p.NAME ||
       p.name ||
+      p.STATE_NAME ||
       'Unknown';
 
 
@@ -2153,21 +2180,13 @@
 
     const gopPercent =
       total > 0
-
-        ? (
-            gop / total * 100
-          ).toFixed(1)
-
+        ? (gop / total * 100).toFixed(1)
         : '0.0';
 
 
     const demPercent =
       total > 0
-
-        ? (
-            dem / total * 100
-          ).toFixed(1)
-
+        ? (dem / total * 100).toFixed(1)
         : '0.0';
 
 
@@ -2184,16 +2203,12 @@
           opacity:0.7;
         ">
 
-          ${
-            p.electoral_votes || 0
-          }
+          ${p.electoral_votes || 0}
           Electoral Votes
 
           •
 
-          ${
-            p.reporting || 0
-          }% Reporting
+          ${p.reporting || 0}% Reporting
 
         </div>
 
@@ -2202,19 +2217,12 @@
 
       <div class="popup-body">
 
-
         <div class="
           candidate-row
-          ${
-            gop > dem
-              ? 'winner'
-              : ''
-          }
+          ${gop > dem ? 'winner' : ''}
         ">
 
-          <img
-            src="images/austinwarner2.jpg"
-          >
+          <img src="images/austinwarner2.jpg">
 
           <div style="flex:1">
 
@@ -2230,7 +2238,6 @@
 
           </div>
 
-
           <strong>
             ${gopPercent}%
           </strong>
@@ -2240,16 +2247,10 @@
 
         <div class="
           candidate-row
-          ${
-            dem > gop
-              ? 'winner'
-              : ''
-          }
+          ${dem > gop ? 'winner' : ''}
         ">
 
-          <img
-            src="images/Barack-Obama.webp"
-          >
+          <img src="images/Barack-Obama.webp">
 
           <div style="flex:1">
 
@@ -2264,7 +2265,6 @@
             </small>
 
           </div>
-
 
           <strong>
             ${demPercent}%
@@ -2330,13 +2330,8 @@
       .forEach(item => {
 
         item.classList.toggle(
-
           'hidden',
-
-          !item.dataset.name.includes(
-            search
-          )
-
+          !item.dataset.name.includes(search)
         );
 
       });
@@ -2398,19 +2393,15 @@
 
       const progress =
         Math.min(
-          (time - startTime) /
-          duration,
+          (time - startTime) / duration,
           1
         );
 
 
       const value =
         Math.floor(
-
           start +
-          (end - start) *
-          progress
-
+          (end - start) * progress
         );
 
 
@@ -2420,18 +2411,14 @@
 
       if (progress < 1) {
 
-        requestAnimationFrame(
-          animate
-        );
+        requestAnimationFrame(animate);
 
       }
 
     }
 
 
-    requestAnimationFrame(
-      animate
-    );
+    requestAnimationFrame(animate);
 
   }
 
@@ -2457,6 +2444,6 @@
   }
 
 </script>
-
+  
 </body>
 </html>
